@@ -148,33 +148,31 @@
     />
   </head>
   <script>
-    /* bridge.js — канал fmg-bridge-v1, capture:true, экспорт SVG кусками */
-    (function () {
-      const CHUNK = 80000; // ~80k символов в сообщении
+    /* bridge.js — экспорт SVG кусками, без зависимости от window.pack */
+    (function(){
       const CHAN  = 'fmg-bridge-v1';
+      const CHUNK = 80000; // ~80k символов на сообщение
     
-      function isReady(){
-        try { return window.pack && Array.isArray(window.pack.burgs) && window.pack.burgs.length > 0; }
-        catch { return false; }
-      }
-      async function waitReady(timeout=120000){
-        const t0 = Date.now();
-        while (!isReady()) {
-          if (Date.now() - t0 > timeout) throw new Error('FMG not ready');
-          await new Promise(r=>setTimeout(r,50));
-        }
-      }
       function reply(ev, payload){
-        const msg = { ...payload, chan: CHAN };
+        const msg = { chan: CHAN, ...payload };
         try { ev.source && ev.source.postMessage(msg, '*'); } catch(e){}
         try { window.parent && window.parent.postMessage(msg, '*'); } catch(e){}
       }
     
-      const onMessage = async (ev) => {
-        const data = ev.data || {};
-        if (!data || data.chan !== CHAN) return; // чужие сообщения игнорим
+      async function waitForSvg(timeout=120000){
+        const t0 = Date.now();
+        while (true){
+          const svg = document.querySelector('svg');
+          if (svg && svg.children && svg.children.length) return svg;
+          if (Date.now() - t0 > timeout) throw new Error('SVG not found');
+          await new Promise(r=>setTimeout(r,50));
+        }
+      }
     
-        const { type, requestId } = data;
+      window.addEventListener('message', async (ev)=>{
+        const d = ev.data || {};
+        if (d.chan !== CHAN) return;
+        const { type, requestId } = d;
         if (!type || !requestId) return;
     
         try {
@@ -184,23 +182,19 @@
           }
     
           if (type === 'export') {
-            await waitReady();
-            const svgEl = document.querySelector('svg');
-            if (!svgEl) throw new Error('SVG not found');
+            const svgEl  = await waitForSvg();                       // ждём, пока <svg> готов
+            const svgStr = new XMLSerializer().serializeToString(svgEl);
     
-            const svg  = new XMLSerializer().serializeToString(svgEl);
-            const meta = {
-              burgs:  window.pack?.burgs?.length ?? 0,
-              states: window.pack?.states?.length ?? 0,
-              cells:  window.pack?.cells?.i?.length ?? 0
-            };
-    
-            const total = Math.ceil(svg.length / CHUNK) || 1;
-            reply(ev, { type: 'export-start', requestId, total, meta });
+            const total = Math.ceil(svgStr.length / CHUNK) || 1;
+            reply(ev, { type: 'export-start', requestId, total, meta: null });
     
             for (let i = 0; i < total; i++) {
-              const part = svg.slice(i * CHUNK, (i + 1) * CHUNK);
-              reply(ev, { type: 'export-chunk', requestId, index: i, data: part });
+              reply(ev, {
+                type: 'export-chunk',
+                requestId,
+                index: i,
+                data: svgStr.slice(i * CHUNK, (i + 1) * CHUNK)
+              });
             }
     
             reply(ev, { type: 'export-end', requestId });
@@ -209,15 +203,12 @@
         } catch (err) {
           reply(ev, { type: 'error', requestId, error: String(err?.message || err) });
         }
-      };
+      }, true);
     
-      // Вешаемся с приоритетом, чтобы нас не «перебили»
-      window.addEventListener('message', onMessage, true);
-    
-      // Сообщаем хосту, что мост жив
+      // сигнал хосту, что мост поднялся
       try { window.parent && window.parent.postMessage({ chan: CHAN, type: 'bridge-ready' }, '*'); } catch {}
     })();
-    </script>                     
+    </script>           
   <body>
     <svg
       id="map"
