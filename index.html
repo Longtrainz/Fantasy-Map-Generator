@@ -148,9 +148,21 @@
     />
   </head>
   <script>
-    /* bridge.js — минимальный API: hello + export */
+    /* bridge.js — минимальный API c ожиданием готовности */
     (function () {
-      window.addEventListener('message', (ev) => {
+      function isReady(){
+        try { return window.pack && Array.isArray(window.pack.burgs) && window.pack.burgs.length > 0; }
+        catch { return false; }
+      }
+      async function waitReady(timeout=120000){
+        const t0 = Date.now();
+        while (!isReady()) {
+          if (Date.now() - t0 > timeout) throw new Error('FMG not ready');
+          await new Promise(r=>setTimeout(r,50));
+        }
+      }
+    
+      window.addEventListener('message', async (ev) => {
         const { type, requestId } = ev.data || {};
         try {
           if (type === 'hello') {
@@ -158,10 +170,11 @@
             return;
           }
           if (type === 'export') {
+            await waitReady();                             // ← ждём генерацию
             const svgEl = document.querySelector('svg');
             if (!svgEl) throw new Error('SVG not found');
-            const svg = new XMLSerializer().serializeToString(svgEl);
-            const pack = window.pack; // данные FMG (burgs, states, ...)
+            const svg  = new XMLSerializer().serializeToString(svgEl);
+            const pack = JSON.parse(JSON.stringify(window.pack)); // безопасная копия
             ev.source.postMessage({ type: 'export-ok', requestId, pack, svg }, ev.origin);
             return;
           }
@@ -170,10 +183,9 @@
         }
       });
     
-      // Сообщаем хост-странице, что мост загрузился
       try { window.parent && window.parent.postMessage({ type: 'bridge-ready' }, '*'); } catch {}
     })();
-    </script>    
+    </script>        
   <body>
     <svg
       id="map"
