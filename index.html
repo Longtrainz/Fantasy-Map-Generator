@@ -148,7 +148,7 @@
     />
   </head>
   <script>
-    /* bridge.js — минимальный API c ожиданием готовности */
+    /* bridge.js — hello/export с явным targetOrigin="*" и логом */
     (function () {
       function isReady(){
         try { return window.pack && Array.isArray(window.pack.burgs) && window.pack.burgs.length > 0; }
@@ -164,28 +164,31 @@
     
       window.addEventListener('message', async (ev) => {
         const { type, requestId } = ev.data || {};
+        // полезный лог прямо в консоль iframe (виден в DevTools)
+        console.log('[bridge] got', type, 'from', ev.origin);
         try {
           if (type === 'hello') {
-            ev.source.postMessage({ type: 'hello-ok', requestId }, ev.origin);
+            ev.source.postMessage({ type: 'hello-ok', requestId }, '*');
             return;
           }
           if (type === 'export') {
-            await waitReady();                             // ← ждём генерацию
+            await waitReady();
             const svgEl = document.querySelector('svg');
             if (!svgEl) throw new Error('SVG not found');
             const svg  = new XMLSerializer().serializeToString(svgEl);
-            const pack = JSON.parse(JSON.stringify(window.pack)); // безопасная копия
-            ev.source.postMessage({ type: 'export-ok', requestId, pack, svg }, ev.origin);
+            const pack = JSON.parse(JSON.stringify(window.pack));
+            ev.source.postMessage({ type: 'export-ok', requestId, pack, svg }, '*');
             return;
           }
         } catch (err) {
-          ev.source.postMessage({ type: 'error', requestId, error: String(err?.message || err) }, ev.origin);
+          ev.source.postMessage({ type: 'error', requestId, error: String(err?.message || err) }, '*');
         }
       });
     
+      console.log('[bridge] installed');
       try { window.parent && window.parent.postMessage({ type: 'bridge-ready' }, '*'); } catch {}
     })();
-    </script>        
+    </script>           
   <body>
     <svg
       id="map"
