@@ -147,6 +147,33 @@
       onload="this.onload=null; this.rel='stylesheet'"
     />
   </head>
+  <script>
+    /* bridge.js — минимальный API: hello + export */
+    (function () {
+      window.addEventListener('message', (ev) => {
+        const { type, requestId } = ev.data || {};
+        try {
+          if (type === 'hello') {
+            ev.source.postMessage({ type: 'hello-ok', requestId }, ev.origin);
+            return;
+          }
+          if (type === 'export') {
+            const svgEl = document.querySelector('svg');
+            if (!svgEl) throw new Error('SVG not found');
+            const svg = new XMLSerializer().serializeToString(svgEl);
+            const pack = window.pack; // данные FMG (burgs, states, ...)
+            ev.source.postMessage({ type: 'export-ok', requestId, pack, svg }, ev.origin);
+            return;
+          }
+        } catch (err) {
+          ev.source.postMessage({ type: 'error', requestId, error: String(err?.message || err) }, ev.origin);
+        }
+      });
+    
+      // Сообщаем хост-странице, что мост загрузился
+      try { window.parent && window.parent.postMessage({ type: 'bridge-ready' }, '*'); } catch {}
+    })();
+    </script>    
   <body>
     <svg
       id="map"
