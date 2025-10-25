@@ -148,8 +148,10 @@
     />
   </head>
   <script>
-    /* bridge.js — hello + export(svg), с двойной отправкой ответа и логами ошибок */
+    /* bridge.js — hello + export c поблочной отправкой SVG */
     (function () {
+      const CHUNK = 80000; // ~80k символов на сообщение
+    
       function isReady(){
         try { return window.pack && Array.isArray(window.pack.burgs) && window.pack.burgs.length > 0; }
         catch { return false; }
@@ -161,15 +163,14 @@
           await new Promise(r=>setTimeout(r,50));
         }
       }
-    
       function reply(ev, payload){
-        try { ev.source && ev.source.postMessage(payload, '*'); } catch(e){ console.warn('[bridge] ev.source post failed', e); }
-        try { window.parent && window.parent.postMessage(payload, '*'); } catch(e){ console.warn('[bridge] parent post failed', e); }
+        try { ev.source && ev.source.postMessage(payload, '*'); } catch(e){}
+        try { window.parent && window.parent.postMessage(payload, '*'); } catch(e){}
       }
     
       window.addEventListener('message', async (ev) => {
         const { type, requestId } = ev.data || {};
-        console.log('[bridge] got', type, 'from', ev.origin);
+        if (!type) return;
         try {
           if (type === 'hello') {
             reply(ev, { type: 'hello-ok', requestId });
@@ -179,26 +180,33 @@
             await waitReady();
             const svgEl = document.querySelector('svg');
             if (!svgEl) throw new Error('SVG not found');
+    
             const svg  = new XMLSerializer().serializeToString(svgEl);
             const meta = {
               burgs:  window.pack?.burgs?.length ?? 0,
               states: window.pack?.states?.length ?? 0,
               cells:  window.pack?.cells?.i?.length ?? 0
             };
-            console.log('[bridge] export-ok send', { svgLen: svg.length, meta });
-            reply(ev, { type: 'export-ok', requestId, svg, meta });
+    
+            const total = Math.ceil(svg.length / CHUNK) || 1;
+            reply(ev, { type: 'export-start', requestId, total, meta });
+    
+            for (let i = 0; i < total; i++) {
+              const part = svg.slice(i * CHUNK, (i + 1) * CHUNK);
+              reply(ev, { type: 'export-chunk', requestId, index: i, data: part });
+            }
+    
+            reply(ev, { type: 'export-end', requestId });
             return;
           }
         } catch (err) {
-          console.error('[bridge] ERROR', err);
           reply(ev, { type: 'error', requestId, error: String(err?.message || err) });
         }
       });
     
-      console.log('[bridge] installed');
       try { window.parent && window.parent.postMessage({ type: 'bridge-ready' }, '*'); } catch {}
     })();
-    </script>               
+    </script>                  
   <body>
     <svg
       id="map"
