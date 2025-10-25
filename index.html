@@ -148,9 +148,10 @@
     />
   </head>
   <script>
-    /* bridge.js — hello + export c поблочной отправкой SVG */
+    /* bridge.js — канал fmg-bridge-v1, capture:true, экспорт SVG кусками */
     (function () {
-      const CHUNK = 80000; // ~80k символов на сообщение
+      const CHUNK = 80000; // ~80k символов в сообщении
+      const CHAN  = 'fmg-bridge-v1';
     
       function isReady(){
         try { return window.pack && Array.isArray(window.pack.burgs) && window.pack.burgs.length > 0; }
@@ -164,18 +165,24 @@
         }
       }
       function reply(ev, payload){
-        try { ev.source && ev.source.postMessage(payload, '*'); } catch(e){}
-        try { window.parent && window.parent.postMessage(payload, '*'); } catch(e){}
+        const msg = { ...payload, chan: CHAN };
+        try { ev.source && ev.source.postMessage(msg, '*'); } catch(e){}
+        try { window.parent && window.parent.postMessage(msg, '*'); } catch(e){}
       }
     
-      window.addEventListener('message', async (ev) => {
-        const { type, requestId } = ev.data || {};
-        if (!type) return;
+      const onMessage = async (ev) => {
+        const data = ev.data || {};
+        if (!data || data.chan !== CHAN) return; // чужие сообщения игнорим
+    
+        const { type, requestId } = data;
+        if (!type || !requestId) return;
+    
         try {
           if (type === 'hello') {
             reply(ev, { type: 'hello-ok', requestId });
             return;
           }
+    
           if (type === 'export') {
             await waitReady();
             const svgEl = document.querySelector('svg');
@@ -202,11 +209,15 @@
         } catch (err) {
           reply(ev, { type: 'error', requestId, error: String(err?.message || err) });
         }
-      });
+      };
     
-      try { window.parent && window.parent.postMessage({ type: 'bridge-ready' }, '*'); } catch {}
+      // Вешаемся с приоритетом, чтобы нас не «перебили»
+      window.addEventListener('message', onMessage, true);
+    
+      // Сообщаем хосту, что мост жив
+      try { window.parent && window.parent.postMessage({ chan: CHAN, type: 'bridge-ready' }, '*'); } catch {}
     })();
-    </script>                  
+    </script>                     
   <body>
     <svg
       id="map"
