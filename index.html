@@ -148,7 +148,7 @@
     />
   </head>
   <script>
-    /* bridge.js — hello/export с явным targetOrigin="*" и логом */
+    /* bridge.js — hello/export, ждём готовность и отправляем pack без JSON.stringify */
     (function () {
       function isReady(){
         try { return window.pack && Array.isArray(window.pack.burgs) && window.pack.burgs.length > 0; }
@@ -164,7 +164,6 @@
     
       window.addEventListener('message', async (ev) => {
         const { type, requestId } = ev.data || {};
-        // полезный лог прямо в консоль iframe (виден в DevTools)
         console.log('[bridge] got', type, 'from', ev.origin);
         try {
           if (type === 'hello') {
@@ -176,7 +175,9 @@
             const svgEl = document.querySelector('svg');
             if (!svgEl) throw new Error('SVG not found');
             const svg  = new XMLSerializer().serializeToString(svgEl);
-            const pack = JSON.parse(JSON.stringify(window.pack));
+            const pack = window.pack; // ← отправляем как есть (structured clone)
+            // маленький лог, чтобы видеть, что ответ ушёл
+            console.log('[bridge] export-ok send', { burgs: pack?.burgs?.length || 0, svgLen: svg.length });
             ev.source.postMessage({ type: 'export-ok', requestId, pack, svg }, '*');
             return;
           }
@@ -188,7 +189,7 @@
       console.log('[bridge] installed');
       try { window.parent && window.parent.postMessage({ type: 'bridge-ready' }, '*'); } catch {}
     })();
-    </script>           
+    </script>              
   <body>
     <svg
       id="map"
