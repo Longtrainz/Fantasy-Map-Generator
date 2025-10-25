@@ -148,7 +148,7 @@
     />
   </head>
   <script>
-    /* bridge.js — hello/export, ждём готовность и отправляем pack без JSON.stringify */
+    /* bridge.js — hello + export(svg-only), ждём готовность */
     (function () {
       function isReady(){
         try { return window.pack && Array.isArray(window.pack.burgs) && window.pack.burgs.length > 0; }
@@ -174,11 +174,19 @@
             await waitReady();
             const svgEl = document.querySelector('svg');
             if (!svgEl) throw new Error('SVG not found');
-            const svg  = new XMLSerializer().serializeToString(svgEl);
-            const pack = window.pack; // ← отправляем как есть (structured clone)
-            // маленький лог, чтобы видеть, что ответ ушёл
-            console.log('[bridge] export-ok send', { burgs: pack?.burgs?.length || 0, svgLen: svg.length });
-            ev.source.postMessage({ type: 'export-ok', requestId, pack, svg }, '*');
+    
+            // сериализуем только SVG
+            const svg = new XMLSerializer().serializeToString(svgEl);
+    
+            // чуть-чуть метаданных, чтобы видеть, что всё ок
+            const meta = {
+              burgs:  window.pack?.burgs?.length ?? 0,
+              states: window.pack?.states?.length ?? 0,
+              cells:  window.pack?.cells?.i?.length ?? 0
+            };
+    
+            console.log('[bridge] export-ok send (svg-only)', { svgLen: svg.length, meta });
+            ev.source.postMessage({ type: 'export-ok', requestId, svg, meta }, '*');
             return;
           }
         } catch (err) {
