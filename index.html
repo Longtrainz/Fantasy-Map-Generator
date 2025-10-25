@@ -148,7 +148,7 @@
     />
   </head>
   <script>
-    /* bridge.js — hello + export(svg-only), ждём готовность */
+    /* bridge.js — hello + export(svg), с двойной отправкой ответа и логами ошибок */
     (function () {
       function isReady(){
         try { return window.pack && Array.isArray(window.pack.burgs) && window.pack.burgs.length > 0; }
@@ -162,42 +162,43 @@
         }
       }
     
+      function reply(ev, payload){
+        try { ev.source && ev.source.postMessage(payload, '*'); } catch(e){ console.warn('[bridge] ev.source post failed', e); }
+        try { window.parent && window.parent.postMessage(payload, '*'); } catch(e){ console.warn('[bridge] parent post failed', e); }
+      }
+    
       window.addEventListener('message', async (ev) => {
         const { type, requestId } = ev.data || {};
         console.log('[bridge] got', type, 'from', ev.origin);
         try {
           if (type === 'hello') {
-            ev.source.postMessage({ type: 'hello-ok', requestId }, '*');
+            reply(ev, { type: 'hello-ok', requestId });
             return;
           }
           if (type === 'export') {
             await waitReady();
             const svgEl = document.querySelector('svg');
             if (!svgEl) throw new Error('SVG not found');
-    
-            // сериализуем только SVG
-            const svg = new XMLSerializer().serializeToString(svgEl);
-    
-            // чуть-чуть метаданных, чтобы видеть, что всё ок
+            const svg  = new XMLSerializer().serializeToString(svgEl);
             const meta = {
               burgs:  window.pack?.burgs?.length ?? 0,
               states: window.pack?.states?.length ?? 0,
               cells:  window.pack?.cells?.i?.length ?? 0
             };
-    
-            console.log('[bridge] export-ok send (svg-only)', { svgLen: svg.length, meta });
-            ev.source.postMessage({ type: 'export-ok', requestId, svg, meta }, '*');
+            console.log('[bridge] export-ok send', { svgLen: svg.length, meta });
+            reply(ev, { type: 'export-ok', requestId, svg, meta });
             return;
           }
         } catch (err) {
-          ev.source.postMessage({ type: 'error', requestId, error: String(err?.message || err) }, '*');
+          console.error('[bridge] ERROR', err);
+          reply(ev, { type: 'error', requestId, error: String(err?.message || err) });
         }
       });
     
       console.log('[bridge] installed');
       try { window.parent && window.parent.postMessage({ type: 'bridge-ready' }, '*'); } catch {}
     })();
-    </script>              
+    </script>               
   <body>
     <svg
       id="map"
