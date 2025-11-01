@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>FMG bridge test (host)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #10131a;
+      --panel: #151922;
+      --panel-border: #2a3040;
+      --text: #ffffff;
+      --muted: #a2abbc;
+      --accent: #3b82f6;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      height: 42px;
+      border-bottom: 1px solid #0e1117;
+      background: #0c0f14;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 16px;
+      flex: 0 0 auto;
+    }
+
+    .btn {
+      background: #1f2937;
+      border: 1px solid rgba(255,255,255,.05);
+      color: #fff;
+      font-size: 13px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background .12s ease-out;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn.primary {
+      background: #3b82f6;
+      border-color: #3b82f6;
+    }
+
+    .btn:disabled {
+      opacity: .6;
+      cursor: not-allowed;
+    }
+
+    .status {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    main {
+      flex: 1 1 auto;
+      display: flex;
+      gap: 12px;
+      padding: 12px;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    .col {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .col.left {
+      flex: 1.2;
+      min-width: 0;
+    }
+
+    .col.right {
+      width: 360px;
+      min-width: 320px;
+    }
+
+    .col-header {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,.02);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    #fmgFrame {
+      border: none;
+      width: 100%;
+      height: 100%;
+      background: #000;
+    }
+
+    .preview-area {
+      flex: 1 1 auto;
+      padding: 12px;
+      overflow: auto;
+      background: #050910;
+    }
+
+    /* мини-рамка для svg */
+    #exportPreview {
+      width: 100%;
+      min-height: 280px;
+      background: #000;
+      border: 1px solid rgba(255,255,255,.04);
+      border-radius: 10px;
+      overflow: auto;
+    }
+
+    #exportPreview svg {
+      display: block;
+      background: #000;
+    }
+
+    .download-wrap {
+      border-top: 1px solid rgba(255,255,255,.05);
+      padding: 12px;
+      display: flex;
+      justify-content: flex-start;
+      gap: 8px;
+    }
+
+    .small-hint {
+      font-size: 11px;
+      color: rgba(255,255,255,.4);
+    }
+
+    /* чтобы iframe не "перекрывал" хедер при рисовании */
+    .iframe-wrap {
+      flex: 1 1 auto;
+      min-height: 0;
+      position: relative;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <button id="btnExport" class="btn primary">Export map</button>
+    <button id="btnDownload" class="btn" disabled>Скачать SVG</button>
+    <span id="status" class="status">ожидаю iframe…</span>
+  </header>
+
+  <main>
+    <div class="col left">
+      <div class="col-header">Генератор</div>
+      <div class="iframe-wrap">
+        <!-- наш окружённый iframe -->
+        <iframe
+          id="fmgFrame"
+          src="https://longtrainz.github.io/Fantasy-Map-Generator/"
+          loading="eager"
+        ></iframe>
+      </div>
+    </div>
+
+    <div class="col right">
+      <div class="col-header">Превью экспорта</div>
+      <div class="preview-area">
+        <div id="exportPreview"></div>
+      </div>
+      <div class="download-wrap">
+        <span class="small-hint" id="svgInfo">нет SVG</span>
+      </div>
+    </div>
+  </main>
+
+  <script src="./script.js"></script>
+</body>
+</html>
